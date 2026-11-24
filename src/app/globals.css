@@ -1,26 +1,43 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --font-sans: var(--font-jakarta), "Helvetica Neue", Arial, sans-serif;
+
+  /* Ink + sky palette sampled from the reference hero */
+  --color-ink: #000d10;
+  --color-ink-soft: #2b3a44;
+  --color-mute: #56636d;
+  --color-sky-top: #7d9cc4;
+  --color-sky-mid: #b8cbe0;
+  --color-sky-haze: #f3f5f7;
+  --color-line: rgb(0 13 16 / 0.14);
+  --color-brand: #e4002b;
+  --color-brand-dark: #c20025;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-sky-haze);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+/* Logo marquee: clipped strip with 48px faded edges */
+.marquee-mask {
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, #000 48px, #000 calc(100% - 48px), transparent);
+}
+
+/* Moving CTA border: a conic "comet" spinning behind the button face */
+@keyframes border-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+.cta-glow {
+  background-image: conic-gradient(transparent 200deg, #0b0d12);
+  transform: translate(-50%, -50%);
+  animation: border-spin 4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cta-glow { animation: none; }
 }

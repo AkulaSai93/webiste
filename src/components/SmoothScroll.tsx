@@ -8,18 +8,23 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 gsap.registerPlugin(ScrollTrigger);
 
+/** The live Lenis instance (null until mounted / with reduced motion). */
+export let lenis: Lenis | null = null;
+
 /** Lenis smooth scrolling, driven by GSAP's ticker so ScrollTrigger stays in sync. */
 export default function SmoothScroll() {
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const lenis = new Lenis({ lerp: 0.1, smoothWheel: true });
-    lenis.on("scroll", ScrollTrigger.update);
-    const tick = (time: number) => lenis.raf(time * 1000);
+    const l = new Lenis({ lerp: 0.1, smoothWheel: true });
+    lenis = l;
+    l.on("scroll", ScrollTrigger.update);
+    const tick = (time: number) => l.raf(time * 1000);
     gsap.ticker.add(tick);
     gsap.ticker.lagSmoothing(0);
     return () => {
       gsap.ticker.remove(tick);
-      lenis.destroy();
+      l.destroy();
+      lenis = null;
     };
   }, []);
   return null;

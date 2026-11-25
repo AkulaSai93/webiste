@@ -222,9 +222,17 @@ export default function Mascot() {
     // data-mascot-walk: a horizontal strip (the ground). While it is on screen the bot
     // stands on it, side-on, and walks left → right; the section drives the step
     // progress through data-walk-p (0..1), so every step is tied to the scroll.
-    const walk: { el: HTMLElement | null; on: boolean; phase: number } = {
+    const walk: {
+      el: HTMLElement | null;
+      road: HTMLElement | null; // data-mascot-road: walk toward the viewer, down a road
+      on: boolean;
+      front: boolean;
+      phase: number;
+    } = {
       el: null,
+      road: null,
       on: false,
+      front: false,
       phase: 0,
     };
     const WALK_STEPS = 9;
@@ -280,6 +288,7 @@ export default function Mascot() {
 
     const ctx = gsap.context(() => {
       walk.el = document.querySelector<HTMLElement>("[data-mascot-walk]");
+      walk.road = document.querySelector<HTMLElement>("[data-mascot-path]");
       dock.el = document.querySelector<HTMLElement>("[data-mascot-dock]");
       if (dock.el) {
         ScrollTrigger.create({
@@ -417,6 +426,34 @@ export default function Mascot() {
           view.turn = 1.05;
         }
       }
+      // path: an <svg data-mascot-path> whose section writes the bot's point on a
+      // thin line (data-walk-x/-y in svg px, -len, -dir d|r|l); the bot stands on
+      // it, faces you going down and turns side-on going right / left
+      walk.front = false;
+      if (!walk.on && walk.road && !metrics.mobile) {
+        const r = walk.road.getBoundingClientRect();
+        const d = walk.road.dataset;
+        if (d.walkX && r.bottom > 0 && r.top < window.innerHeight) {
+          const vh = window.innerHeight;
+          const px = r.left + Number(d.walkX);
+          const py = r.top + Number(d.walkY);
+          if (py > -200 && py < vh + 300) {
+            const hPx = d.mascotHeight
+              ? Number(d.mascotHeight)
+              : Math.min(230, vh * 0.24);
+            const sc = (hPx * 2 * halfH) / (vh * metrics.botH);
+            const feet = -2.57 + bot.floatBase;
+            const dir = d.walkDir ?? "d";
+            walk.on = true;
+            walk.front = dir === "d";
+            walk.phase = (Number(d.walkLen) / 110) * Math.PI * 2;
+            view.x = (px / window.innerWidth) * 2 - 1;
+            view.y = ((1 - (2 * py) / vh) * halfH - feet * sc) / halfH;
+            view.s = sc;
+            view.turn = dir === "r" ? 1.05 : dir === "l" ? -1.05 : 0;
+          }
+        }
+      }
 
       // docked: fly in from the right and stand inside the dock element
       dock.k = 0;
@@ -550,7 +587,7 @@ export default function Mascot() {
       }
 
       // head follows the cursor (relative to the bot's own facing)
-      if (walk.on) headTarget.set(0.05, -0.45, 0);
+      if (walk.on) headTarget.set(0.05, walk.front ? 0 : -0.45, 0);
       else
         headTarget.set(
           -pointer.y * 0.22,

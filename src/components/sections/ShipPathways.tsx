@@ -20,19 +20,19 @@ const PATHWAYS = [
     key: "jobs",
     title: ["Launch a High-Paying", "Tech Career"],
     body: "Get industry-ready with hands-on coding, hackathons and strong placement support.",
-    img: "/images/pathways-band/photo-jobs.webp",
+    img: "/images/pathways-band/icon3d-jobs.webp",
   },
   {
     key: "startup",
     title: ["Build Your Own Startup,", "While You Study"],
     body: "Launch your startup while you study, with mentorship, incubation and seed funding",
-    img: "/images/pathways-band/photo-startup.webp",
+    img: "/images/pathways-band/icon3d-startup.webp",
   },
   {
     key: "research",
     title: ["Research Today, Study at", "Top Global Universities"],
     body: "Build research skills and prepare for GRE, IELTS and top global universities.",
-    img: "/images/pathways-band/photo-research.webp",
+    img: "/images/pathways-band/icon3d-research.webp",
   },
 ] as const;
 
@@ -141,7 +141,7 @@ export default function ShipPathways() {
         <div className="absolute inset-x-0 bottom-0 h-[496px] overflow-hidden bg-[#111]">
           <div
             data-sp-band-row
-            className="absolute top-[72px] left-[max(20px,calc((100vw-1200px)/2))] flex w-max items-end gap-[140px]"
+            className="absolute top-[107px] left-[max(20px,calc((100vw-1200px)/2))] flex w-max items-end gap-[140px]"
           >
             <BandIntro />
             <BandColumns />
@@ -189,12 +189,12 @@ function BandColumns({ stacked = false }: { stacked?: boolean }) {
           className="flex w-[368px] max-w-full flex-col items-start border-l border-white/[0.08] pl-[35px]"
         >
           <div className="pb-[21px]">
-            <span className="relative block aspect-[16/9] w-[298px] max-w-full overflow-hidden rounded-[8px] bg-white/5">
+            <span className="relative block size-[88px] overflow-hidden rounded-[12px] bg-[#111]">
               <Image
                 src={p.img}
                 alt=""
                 fill
-                sizes="300px"
+                sizes="88px"
                 className="object-cover"
               />
             </span>

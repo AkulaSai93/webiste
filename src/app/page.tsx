@@ -3,7 +3,9 @@ import MascotLayer from "@/components/mascot/MascotLayer";
 import SmoothScroll from "@/components/SmoothScroll";
 import PlaceholderSections from "@/components/sections/PlaceholderSections";
 import Specializations from "@/components/sections/Specializations";
-import Pathways from "@/components/sections/Pathways";
+import Campuses from "@/components/sections/Campuses";
+import Mentors from "@/components/sections/Mentors";
+import ShipPathways from "@/components/sections/ShipPathways";
 
 export default function Home() {
   return (
@@ -12,7 +14,9 @@ export default function Home() {
       <MascotLayer />
       <Hero />
       <Specializations />
-      <Pathways />
+      <ShipPathways />
+      <Campuses />
+      <Mentors />
       <PlaceholderSections />
     </main>
   );

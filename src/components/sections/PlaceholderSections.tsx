@@ -1,7 +1,6 @@
 /**
  * PLACEHOLDER sections — only here to show the mascot following the page.
- * Replace with the real sections; keep a data-mascot-stop element in each one
- * to tell the bot where to fly and which code to show.
+ * Replace with the real sections. (The bot's journey ends at Specializations.)
  */
 
 const SECTIONS = [
@@ -29,31 +28,26 @@ export default function PlaceholderSections() {
       {SECTIONS.map((s) => (
         <section key={s.eyebrow} className="relative min-h-svh">
           <div
-            data-mascot-stop
-            data-mascot-x={s.stop.x}
-            data-mascot-y={s.stop.y}
-            data-mascot-scale={s.stop.scale}
-            data-mascot-turn={s.stop.turn}
-            data-mascot-code={s.stop.code}
-            data-mascot-mx={s.side === "left" ? 0.55 : -0.55}
-            data-mascot-my={-0.62}
-            data-mascot-ms={0.32}
-            className="pointer-events-none absolute inset-0"
-          />
-          <div
             className={`relative z-[2] mx-auto flex min-h-svh max-w-[1440px] items-center px-5 py-24 sm:px-10 lg:px-20 ${
               s.side === "right" ? "lg:justify-end" : ""
             }`}
           >
             <div className="max-w-xl">
-              <p className="text-xs font-medium tracking-[0.2em] text-mute uppercase">{s.eyebrow}</p>
+              <p className="text-xs font-medium tracking-[0.2em] text-mute uppercase">
+                {s.eyebrow}
+              </p>
               <h2 className="mt-4 text-[clamp(2rem,4vw,3.75rem)] leading-[1.05] font-medium tracking-[-0.035em] text-ink">
                 {s.title}
               </h2>
-              <p className="mt-5 text-lg leading-relaxed text-ink-soft">{s.body}</p>
+              <p className="mt-5 text-lg leading-relaxed text-ink-soft">
+                {s.body}
+              </p>
               <ul className="mt-8 flex flex-wrap gap-2">
                 {s.chips.map((c) => (
-                  <li key={c} className="rounded-full border border-ink/10 bg-white/70 px-4 py-2 text-sm text-ink backdrop-blur">
+                  <li
+                    key={c}
+                    className="rounded-full border border-ink/10 bg-white/70 px-4 py-2 text-sm text-ink backdrop-blur"
+                  >
                     {c}
                   </li>
                 ))}

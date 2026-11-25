@@ -24,6 +24,12 @@ gsap.registerPlugin(ScrollTrigger);
  *        data-mascot-start / -end    // optional ScrollTrigger range for the flight
  *        data-mascot-fit="0.8"       // size/centre the bot inside this element instead
  *        data-mascot-fit-anchor="section" // …relative to that ancestor's top
+ *        data-mascot-attach          // after arriving, stay glued to this element (scrolls with it)
+ *   />
+ *
+ *   <div data-mascot-dock …fit/scale… />  // the bot flies in and stands here with its hands
+ *        up; clicking its hands dispatches window "mascot:hand" (detail -1 = screen-left
+ *        hand, 1 = screen-right hand) — used by the mentors carousel
  *   />
  *
  * As each stop scrolls into view the bot flies to that pose.
@@ -184,7 +190,106 @@ export default function Mascot() {
     const pose: Pose = { x: 0, y: 0, s: 0.8, turn: 0 };
     const intro = { k: reduced ? 1 : 0, wave: 0 };
 
+    // data-mascot-attach: once the bot arrives at this stop it is glued to the element
+    // (scrolls with its section) instead of hovering at a fixed spot on the screen
+    const attach: { el: HTMLElement | null; p: number } = { el: null, p: 0 };
+    const livePose = (el: HTMLElement): Pose => {
+      const r = el.getBoundingClientRect();
+      const section = el.closest("section");
+      if (metrics.mobile || r.height === 0) {
+        const fixed = readPose(el, metrics);
+        // on phones it rides in its corner until the section has scrolled away
+        if (section && section.getBoundingClientRect().bottom < 0) fixed.y = 3;
+        return fixed;
+      }
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const unitsPerPx = (2 * metrics.halfH) / vh;
+      const fill = num(el.dataset.mascotFit, 0.92);
+      const maxS = num(el.dataset.mascotScale, 0.6);
+      return {
+        x: ((r.left + r.width / 2) / vw) * 2 - 1,
+        y: 1 - ((r.top + r.height / 2) / vh) * 2,
+        s: Math.max(
+          0.12,
+          Math.min(maxS, (r.height * fill * unitsPerPx) / metrics.botH),
+        ),
+        turn: num(el.dataset.mascotTurn, 0),
+      };
+    };
+    const view: Pose = { x: 0, y: 0, s: 0.8, turn: 0 };
+
+    // data-mascot-walk: a horizontal strip (the ground). While it is on screen the bot
+    // stands on it, side-on, and walks left → right; the section drives the step
+    // progress through data-walk-p (0..1), so every step is tied to the scroll.
+    const walk: { el: HTMLElement | null; on: boolean; phase: number } = {
+      el: null,
+      on: false,
+      phase: 0,
+    };
+    const WALK_STEPS = 9;
+
+    // data-mascot-dock: fly in and stand inside this element, hands raised; the
+    // hands are clickable (raycast, since the canvas itself ignores the pointer)
+    const dock = {
+      el: null as HTMLElement | null,
+      p: 0, // scroll progress of the arrival
+      k: 0, // 0..1 how "docked" the bot is this frame
+      hover: 0 as -1 | 0 | 1,
+      poke: { [-1]: 0, [1]: 0 } as Record<number, number>,
+    };
+    const hitMat = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      colorWrite: false,
+    });
+    const hitGeo = new THREE.SphereGeometry(0.5, 12, 8);
+    const hitL = new THREE.Mesh(hitGeo, hitMat); // bot's left = screen-left
+    const hitR = new THREE.Mesh(hitGeo, hitMat);
+    hitL.position.y = hitR.position.y = -0.6;
+    bot.elbowL.add(hitL);
+    bot.elbowR.add(hitR);
+    const raycaster = new THREE.Raycaster();
+    const ndc = new THREE.Vector2();
+    const handAt = (cx: number, cy: number): -1 | 0 | 1 => {
+      if (dock.k < 0.9) return 0;
+      ndc.set(
+        (cx / window.innerWidth) * 2 - 1,
+        -(cy / window.innerHeight) * 2 + 1,
+      );
+      raycaster.setFromCamera(ndc, camera);
+      const hit = raycaster.intersectObjects([hitL, hitR], false)[0];
+      return hit ? (hit.object === hitL ? -1 : 1) : 0;
+    };
+    const onDockMove = (e: PointerEvent) => {
+      const h = handAt(e.clientX, e.clientY);
+      if (h !== dock.hover) {
+        dock.hover = h;
+        document.documentElement.style.cursor = h ? "pointer" : "";
+      }
+    };
+    const onDockClick = (e: MouseEvent) => {
+      const h = handAt(e.clientX, e.clientY);
+      if (!h) return;
+      dock.poke[h] = 1;
+      window.dispatchEvent(new CustomEvent("mascot:hand", { detail: h }));
+    };
+    window.addEventListener("pointermove", onDockMove);
+    window.addEventListener("click", onDockClick);
+
     const ctx = gsap.context(() => {
+      walk.el = document.querySelector<HTMLElement>("[data-mascot-walk]");
+      dock.el = document.querySelector<HTMLElement>("[data-mascot-dock]");
+      if (dock.el) {
+        ScrollTrigger.create({
+          trigger: dock.el.closest("section") ?? dock.el,
+          start: "top 70%",
+          end: "top 5%",
+          onUpdate: (self) => (dock.p = self.progress),
+          onRefresh: (self) => (dock.p = self.progress),
+        });
+      }
       const stops = gsap.utils.toArray<HTMLElement>("[data-mascot-stop]");
       if (!stops.length) return;
 
@@ -207,6 +312,20 @@ export default function Mascot() {
             screen.setSnippet(el.dataset.mascotCode ?? "agent"),
         });
         if (i === 0) return;
+        if (el.dataset.mascotAttach !== undefined) {
+          attach.el = el;
+          ScrollTrigger.create({
+            trigger:
+              (el.dataset.mascotFitAnchor
+                ? el.closest<HTMLElement>(el.dataset.mascotFitAnchor)
+                : null) ?? el,
+            start: el.dataset.mascotStart ?? "top 85%",
+            end: el.dataset.mascotEnd ?? "top 30%",
+            onUpdate: (self) => (attach.p = self.progress),
+            onRefresh: (self) => (attach.p = self.progress),
+          });
+          return;
+        }
         // fromTo with the previous stop as an explicit start, so fast jumps or
         // scrolling back up never leave the bot stranded between stops
         const prev = stops[i - 1];
@@ -265,18 +384,74 @@ export default function Mascot() {
 
       screen.update(dt, reduced);
 
+      // view pose = scroll pose, blended into the attached stop's live position
+      Object.assign(view, pose);
+      if (attach.el && attach.p > 0) {
+        const live = livePose(attach.el);
+        const e =
+          attach.p < 0.5
+            ? 2 * attach.p * attach.p
+            : 1 - Math.pow(-2 * attach.p + 2, 2) / 2;
+        view.x = pose.x + (live.x - pose.x) * e;
+        view.y = pose.y + (live.y - pose.y) * e;
+        view.s = pose.s + (live.s - pose.s) * e;
+        view.turn = pose.turn + (live.turn - pose.turn) * e;
+      }
+
+      // walking on the ground strip overrides the scroll pose
+      walk.on = false;
+      if (walk.el && !metrics.mobile) {
+        const r = walk.el.getBoundingClientRect();
+        const vh = window.innerHeight;
+        if (r.top < vh + 150 && r.top > -150) {
+          const p = Number(walk.el.dataset.walkP ?? 0);
+          const sc =
+            (Math.min(300, vh * 0.3) * 2 * halfH) / (vh * metrics.botH);
+          const groundY = (1 - (2 * r.top) / vh) * halfH;
+          const feet = -2.57 + bot.floatBase; // sole bottom, in bot units
+          walk.on = true;
+          walk.phase = p * WALK_STEPS * Math.PI * 2;
+          view.x = -1.3 + 2.6 * p;
+          view.s = sc;
+          view.y = (groundY - feet * sc) / halfH;
+          view.turn = 1.05;
+        }
+      }
+
+      // docked: fly in from the right and stand inside the dock element
+      dock.k = 0;
+      if (!walk.on && dock.el && !metrics.mobile && dock.p > 0) {
+        const r = dock.el.getBoundingClientRect();
+        if (r.bottom > -300 && r.top < window.innerHeight + 300) {
+          const live = livePose(dock.el);
+          const p = dock.p;
+          const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+          view.x = 1.45 + (live.x - 1.45) * e;
+          view.y = live.y + (1 - e) * 0.6;
+          view.s = live.s;
+          view.turn = -0.7 * (1 - e) + live.turn * e;
+          dock.k = e;
+        }
+      }
+      if (dock.k < 0.9 && dock.hover) {
+        dock.hover = 0;
+        document.documentElement.style.cursor = "";
+      }
+      dock.poke[-1] = Math.max(0, dock.poke[-1] - dt * 2.5);
+      dock.poke[1] = Math.max(0, dock.poke[1] - dt * 2.5);
+
       // place in viewport space
-      const s = pose.s * (0.35 + 0.65 * intro.k);
+      const s = view.s * (0.35 + 0.65 * intro.k);
       bot.root.position.set(
-        pose.x * halfW,
-        pose.y * halfH + (1 - intro.k) * -1.5,
+        view.x * halfW,
+        view.y * halfH + (1 - intro.k) * -1.5,
         0,
       );
       bot.root.scale.setScalar(Math.max(s, 0.001));
 
       // lean into horizontal travel
-      const vx = (pose.x - lastX) / Math.max(dt, 1e-3);
-      lastX = pose.x;
+      const vx = walk.on ? 0 : (view.x - lastX) / Math.max(dt, 1e-3);
+      lastX = view.x;
       lean = THREE.MathUtils.lerp(
         lean,
         THREE.MathUtils.clamp(-vx * 0.25, -0.35, 0.35),
@@ -285,11 +460,32 @@ export default function Mascot() {
       bot.root.rotation.z = lean;
       bot.root.rotation.y = THREE.MathUtils.lerp(
         bot.root.rotation.y,
-        pose.turn,
+        view.turn,
         0.08,
       );
 
-      if (!reduced) {
+      bot.ring.visible = !walk.on;
+      bot.glow.visible = !walk.on;
+
+      if (!reduced && walk.on) {
+        // walk cycle: legs and arms swing in opposition, knees bend on the
+        // forward swing, body dips as the feet spread
+        const ph = walk.phase;
+        const sw = Math.sin(ph);
+        bot.float.position.y = bot.floatBase - Math.abs(sw) * 0.07;
+        bot.float.rotation.x = 0.05;
+        bot.legL.rotation.set(-sw * 0.55, 0, -0.03);
+        bot.legR.rotation.set(sw * 0.55, 0, 0.03);
+        bot.kneeL.rotation.x =
+          0.1 + Math.max(0, Math.sin(ph + Math.PI / 2)) * 0.75;
+        bot.kneeR.rotation.x =
+          0.1 + Math.max(0, Math.sin(ph - Math.PI / 2)) * 0.75;
+        bot.armL.rotation.set(sw * 0.5, 0, -0.22);
+        bot.armR.rotation.set(-sw * 0.5, 0, 0.22);
+        bot.elbowL.rotation.set(-0.45, 0, 0);
+        bot.elbowR.rotation.set(-0.45, 0, 0);
+        bot.chestLight.emissiveIntensity = 0.9 + Math.sin(t * 2.4) * 0.5;
+      } else if (!reduced) {
         // idle bob + breathing
         bot.float.position.y = bot.floatBase + Math.sin(t * 1.6) * 0.09;
         bot.float.rotation.x = Math.sin(t * 1.1) * 0.03;
@@ -321,8 +517,46 @@ export default function Mascot() {
         bot.kneeR.rotation.x = 0.12 + Math.sin(t * 1.6 + 1.4) * 0.06;
       }
 
+      // docked: hands up and out, ready to be pressed; hovered hand lifts, clicked hand pokes
+      if (dock.k > 0 && !walk.on) {
+        const k = dock.k;
+        const lift = (side: -1 | 1) =>
+          (dock.hover === side ? 0.18 : 0) +
+          Math.sin(dock.poke[side] * Math.PI) * 0.45;
+        const bob = reduced ? 0 : Math.sin(t * 2.2) * 0.05;
+        const mix = THREE.MathUtils.lerp;
+        bot.armL.rotation.z = mix(
+          bot.armL.rotation.z,
+          -(1.15 + lift(-1) + bob),
+          k,
+        );
+        bot.armR.rotation.z = mix(bot.armR.rotation.z, 1.15 + lift(1) - bob, k);
+        bot.armL.rotation.x = mix(bot.armL.rotation.x, 0, k);
+        bot.armR.rotation.x = mix(bot.armR.rotation.x, 0, k);
+        bot.elbowL.rotation.z = mix(
+          bot.elbowL.rotation.z,
+          -(0.9 + lift(-1) * 0.6),
+          k,
+        );
+        bot.elbowR.rotation.z = mix(
+          bot.elbowR.rotation.z,
+          0.9 + lift(1) * 0.6,
+          k,
+        );
+        bot.elbowL.rotation.x = mix(bot.elbowL.rotation.x, -0.15, k);
+        bot.elbowR.rotation.x = mix(bot.elbowR.rotation.x, -0.15, k);
+      } else if (!walk.on) {
+        bot.elbowL.rotation.z = 0;
+      }
+
       // head follows the cursor (relative to the bot's own facing)
-      headTarget.set(-pointer.y * 0.22, pointer.x * 0.45 - pose.turn * 0.5, 0);
+      if (walk.on) headTarget.set(0.05, -0.45, 0);
+      else
+        headTarget.set(
+          -pointer.y * 0.22,
+          pointer.x * 0.45 - view.turn * 0.5,
+          0,
+        );
       bot.head.rotation.x = THREE.MathUtils.lerp(
         bot.head.rotation.x,
         headTarget.x,
@@ -334,7 +568,10 @@ export default function Mascot() {
         0.06,
       );
 
-      renderer.render(scene, camera);
+      // parked off-screen (after its last stop): skip drawing
+      const offscreen = Math.abs(view.y) > 1.9;
+      renderer.domElement.style.visibility = offscreen ? "hidden" : "visible";
+      if (!offscreen) renderer.render(scene, camera);
     };
     loop();
 
@@ -348,6 +585,11 @@ export default function Mascot() {
       window.removeEventListener("resize", resize);
       window.removeEventListener("pointermove", onPointer);
       window.removeEventListener("mascot:code", onCode);
+      window.removeEventListener("pointermove", onDockMove);
+      window.removeEventListener("click", onDockClick);
+      document.documentElement.style.cursor = "";
+      hitGeo.dispose();
+      hitMat.dispose();
       window.removeEventListener("load", refresh);
       bot.dispose();
       screen.dispose();

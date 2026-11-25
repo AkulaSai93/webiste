@@ -17,7 +17,7 @@
 
 html,
 body {
-  background: var(--color-sky-haze);
+  background: #ffffff;
   color: var(--color-ink);
   font-family: var(--font-sans);
 }
@@ -40,4 +40,10 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .cta-glow { animation: none; }
+}
+
+/* Pathways: gentle hover for the "specimen" image (KPR-style floating object) */
+@keyframes pw-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
 }
